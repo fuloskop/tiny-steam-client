@@ -1,6 +1,7 @@
 #ifndef __TINY_STEAM_CLIENT_TESTCLIENT_HPP
 #define __TINY_STEAM_CLIENT_TESTCLIENT_HPP
 
+#include <cstdint>
 #include <mutex>
 #include <queue>
 #include <asio.hpp>
@@ -60,7 +61,7 @@ public:
 
 	inline void					RunClient()
 	{
-		s_IoContext.reset();
+		s_IoContext.restart();
 		asio::co_spawn(s_IoContext, WaitForNewTicket(), asio::detached);
 		s_IoContext.run();
 	}

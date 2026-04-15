@@ -1,6 +1,7 @@
 #ifndef __TINY_STEAM_CLIENT_STEAMCLIENT_HPP__
 #define __TINY_STEAM_CLIENT_STEAMCLIENT_HPP__
 
+#include <cstdint>
 #include <chrono>
 #include <queue>
 #include <ctime>
@@ -26,7 +27,7 @@ inline asio::io_context g_IoContext;
 inline constexpr auto MAGIC						= 0x31305456;
 inline constexpr auto AES_KEY_LENGTH			= 32;
 inline constexpr auto PROTO_MASK				= (1 << 31);
-inline constexpr auto APP_ID					= 730;
+inline constexpr auto APP_ID					= 4465480;
 
 inline constexpr auto CLIENT_PROTOCOL_VERSION	= 65580;
 
@@ -529,6 +530,20 @@ private:
 		co_await SendMessageToCM(socket, k_EMsgClientGetAppOwnershipTicket, header, getTicket);
 	}
 
+	asio::awaitable<void> RequestFreeLicenseFromSteam(tcp::socket& socket, uint32_t appid)
+	{
+		//Request free-to-play license for the app.
+		//Also request 730 (CS2) and 4465480 (Legacy) as prerequisites / related apps.
+		auto header = FormProtobufMsgHeader();
+		header.set_jobid_source(1);
+
+		CMsgClientRequestFreeLicense req;
+		req.add_appids(730);
+		if (appid != 730) req.add_appids(appid);
+		req.add_appids(4465480);
+		co_await SendMessageToCM(socket, k_EMsgClientRequestFreeLicense, header, req);
+	}
+
 	asio::awaitable<void> HeartbeatHandler(tcp::socket& socket)
 	{
 		while (true)
@@ -727,7 +742,7 @@ public:
 
 	void RunClients()
 	{
-		g_IoContext.reset();
+		g_IoContext.restart();
 
 		for (auto& client : m_Accounts)
 		{
@@ -757,6 +772,21 @@ inline asio::awaitable<void> NetMsgHandler::HandleMessage(tcp::socket& socket, u
 {
 	switch (type)
 	{
+	case k_EMsgClientRequestFreeLicenseResponse:
+	{
+		auto response = protomsg_cast<CMsgClientRequestFreeLicenseResponse>(pData, dataLen);
+		criticalmsg("[%llu]RequestFreeLicense response: eresult=%d granted_appids=%d\n",
+			m_pSteamClient->m_SteamID, response.eresult(), response.granted_appids_size());
+		for (int i = 0; i < response.granted_appids_size(); ++i) {
+			criticalmsg("[%llu]  granted appid: %u\n", m_pSteamClient->m_SteamID, response.granted_appids(i));
+		}
+		if (response.eresult() == k_EResultOK) {
+			co_await m_pSteamClient->RequestAppAuthSessionTicket(socket, APP_ID);
+		} else {
+			criticalmsg("[%llu]Free license request failed, cannot proceed\n", m_pSteamClient->m_SteamID);
+		}
+		break;
+	}
 	case k_EMsgClientGetAppOwnershipTicketResponse:
 	{
 		auto response = protomsg_cast<CMsgClientGetAppOwnershipTicketResponse>(pData, dataLen);
@@ -804,7 +834,9 @@ inline asio::awaitable<void> NetMsgHandler::HandleMessage(tcp::socket& socket, u
 		if (m_pSteamClient->m_TimeWhenActivateTicket != m_pSteamClient->m_TimeWhenConnectedToCM)
 		{
 			m_pSteamClient->m_TimeWhenActivateTicket = m_pSteamClient->m_TimeWhenConnectedToCM;
-			co_await m_pSteamClient->RequestAppAuthSessionTicket(socket, APP_ID);
+			//Patch: request free license first, ticket flow continues in k_EMsgClientRequestFreeLicenseResponse handler
+			criticalmsg("[%llu]Requesting free license for app %u\n", m_pSteamClient->m_SteamID, APP_ID);
+			co_await m_pSteamClient->RequestFreeLicenseFromSteam(socket, APP_ID);
 		}
 		break;
 	}

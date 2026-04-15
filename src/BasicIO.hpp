@@ -13,7 +13,7 @@ inline int dbgmsg(const char* format, ...)
 #ifndef IGNORE_DBG_MESSAGE
 	va_list args;
 	va_start(args, format);
-	int count = vfprintf(stdout, format, args);
+	int count = vfprintf(stdout, format, args); fflush(stdout);
 	va_end(args);
 	return count;
 #else	
@@ -26,7 +26,7 @@ inline int criticalmsg(const char* format, ...)
 {
 	va_list args;
 	va_start(args, format);
-	int count = vfprintf(stdout, format, args);
+	int count = vfprintf(stdout, format, args); fflush(stdout);
 	va_end(args);
 	return count;
 }

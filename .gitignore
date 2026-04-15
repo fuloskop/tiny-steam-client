@@ -1,0 +1,16 @@
+# Build artifacts
+CMakeCache.txt
+CMakeFiles/
+Makefile
+cmake_install.cmake
+build/
+*.o
+*.obj
+
+# Backup files from patching
+*.bak
+*.orig
+.DS_Store
+
+# Local config (never commit)
+hostname.txt

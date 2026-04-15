@@ -4,6 +4,7 @@
 #pragma warning( disable: 4251 )
 #pragma warning( disable: 4275 )
 
+#include <cstdint>
 #include <rsa.h>
 #include <randpool.h>
 #include <validate.h>
